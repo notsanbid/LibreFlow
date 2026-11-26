@@ -81,7 +81,7 @@ flowchart LR
 
 ### Build Commands
 ```bash
-git clone https://github.com/<your-username>/LibreFlow.git
+git clone https://github.com/notsanbid/LibreFlow.git
 cd LibreFlow
 
 # Run unit tests
