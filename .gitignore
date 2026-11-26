@@ -2,6 +2,7 @@
 decompiled/
 *.xapk
 *.apk
+*.aar
 *.gguf
 *.onnx
 *.bin
