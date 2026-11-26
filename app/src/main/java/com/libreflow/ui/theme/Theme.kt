@@ -14,13 +14,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.libreflow.R
 
-val FlowBackground = Color(0xFFFAF9F6)
+val FlowBackground = Color(0xFFFBF9F5)
 val FlowSurface = Color(0xFFFFFFFF)
-val FlowSurfaceSubtle = Color(0xFFF2F0EB)
-val FlowInk = Color(0xFF141416)
-val FlowMuted = Color(0xFF6B6E75)
-val FlowBorder = Color(0xFFE5E2DC)
-val FlowEmerald = Color(0xFF10B981)
+val FlowSurfaceSubtle = Color(0xFFF3F0EA)
+val FlowInk = Color(0xFF121316)
+val FlowMuted = Color(0xFF64676E)
+val FlowBorder = Color(0xFFEAE6DE)
+val FlowEmerald = Color(0xFF059669)
+val FlowEmeraldTint = Color(0xFFECFDF5)
 val FlowAccent = Color(0xFF18181B)
 val FlowDanger = Color(0xFFDC2626)
 

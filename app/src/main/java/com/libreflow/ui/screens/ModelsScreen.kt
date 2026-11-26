@@ -84,6 +84,14 @@ fun ModelsScreen() {
     val vadReady = vadModels.any { it.downloadState == ModelDownloadState.LOADED.name }
     val asrReady = asrModels.any { it.downloadState == ModelDownloadState.LOADED.name }
     val slmReady = slmModels.any { it.downloadState == ModelDownloadState.LOADED.name }
+    val loadedRamMb = models
+        .filter { it.downloadState == ModelDownloadState.LOADED.name }
+        .sumOf { it.ramRequirementMb }
+
+    val am = remember { context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager }
+    val memInfo = remember(models, loadingIds) {
+        android.app.ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+    }
 
     val loadModel: (ModelDescriptorEntity) -> Unit = { model ->
         loadingIds = loadingIds + model.id
@@ -149,9 +157,11 @@ fun ModelsScreen() {
             Text("Local AI Models", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Detected ${app.ramTier.label}. Stored in Downloads/LibreFlowModels and memory-mapped locally.",
+                text = "Models are stored in Downloads/LibreFlowModels and memory-mapped on demand.",
                 style = MaterialTheme.typography.bodyMedium
             )
+            Spacer(modifier = Modifier.height(10.dp))
+            LiveRamCard(memInfo = memInfo, loadedModelsMb = loadedRamMb)
             Spacer(modifier = Modifier.height(10.dp))
             SetupChecklistCard(vadReady = vadReady, asrReady = asrReady, slmReady = slmReady)
         }
@@ -163,7 +173,7 @@ fun ModelsScreen() {
                 subtitle = "Detects when you start and stop speaking."
             )
         }
-        items(vadModels, key = { it.id }) { model ->
+        items(vadModels, key = { it.id }, contentType = { "model_card" }) { model ->
             ModelItemCard(
                 model = model,
                 isLoadingIntoRam = model.id in loadingIds,
@@ -182,7 +192,7 @@ fun ModelsScreen() {
                 subtitle = "Converts your voice into text offline."
             )
         }
-        items(asrModels, key = { it.id }) { model ->
+        items(asrModels, key = { it.id }, contentType = { "model_card" }) { model ->
             ModelItemCard(
                 model = model,
                 isLoadingIntoRam = model.id in loadingIds,
@@ -201,7 +211,7 @@ fun ModelsScreen() {
                 subtitle = "Fixes grammar, removes fillers, and structures bullet points."
             )
         }
-        items(slmModels, key = { it.id }) { model ->
+        items(slmModels, key = { it.id }, contentType = { "model_card" }) { model ->
             ModelItemCard(
                 model = model,
                 isLoadingIntoRam = model.id in loadingIds,
@@ -210,6 +220,56 @@ fun ModelsScreen() {
                 onLoad = { loadModel(model) },
                 onUnload = { unloadModel(model) },
                 onDelete = { scope.launch { app.downloader.deleteModel(model) } }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveRamCard(
+    memInfo: android.app.ActivityManager.MemoryInfo,
+    loadedModelsMb: Int
+) {
+    val totalGb = memInfo.totalMem / (1024f * 1024f * 1024f)
+    val availGb = memInfo.availMem / (1024f * 1024f * 1024f)
+    val usedGb = (totalGb - availGb).coerceAtLeast(0f)
+    val fraction = if (totalGb > 0f) (usedGb / totalGb).coerceIn(0f, 1f) else 0f
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, FlowBorder, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        color = FlowSurface
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Device Memory (Live)", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    text = String.format("%.1f / %.1f GB used", usedGb, totalGb),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = FlowInk
+                )
+            }
+            LinearProgressIndicator(
+                progress = { fraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = if (fraction > 0.85f) FlowDanger else FlowEmerald,
+                trackColor = FlowSurfaceSubtle
+            )
+            Text(
+                text = if (loadedModelsMb > 0) {
+                    "Loaded AI models: ~$loadedModelsMb MB • ${String.format("%.1f GB", availGb)} free"
+                } else {
+                    "No AI models loaded in RAM • ${String.format("%.1f GB", availGb)} free"
+                },
+                style = MaterialTheme.typography.bodyMedium
             )
         }
     }
@@ -326,74 +386,69 @@ private fun ModelItemCard(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            AnimatedContent(
-                targetState = Triple(state, isLoadingIntoRam, supported),
-                label = "modelActionState"
-            ) { (curState, loadingRam, isSupported) ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    when {
-                        loadingRam -> {
-                            Button(
-                                onClick = {},
-                                enabled = false,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    disabledContainerColor = FlowSurfaceSubtle,
-                                    disabledContentColor = FlowInk
-                                )
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                    color = FlowInk
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Loading into RAM...")
-                            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                when {
+                    isLoadingIntoRam -> {
+                        Button(
+                            onClick = {},
+                            enabled = false,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                disabledContainerColor = FlowSurfaceSubtle,
+                                disabledContentColor = FlowInk
+                            )
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = FlowInk
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Loading into RAM...")
                         }
-                        curState == ModelDownloadState.NOT_DOWNLOADED || curState == ModelDownloadState.ERROR -> {
-                            Button(
-                                onClick = onDownload,
-                                enabled = isSupported,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = FlowInk,
-                                    contentColor = Color.White,
-                                    disabledContainerColor = Color(0xFFE0DDD7),
-                                    disabledContentColor = Color(0xFF8A8D94)
-                                )
-                            ) {
-                                Text(if (isSupported) "Download" else "Unavailable on x86_64")
-                            }
+                    }
+                    state == ModelDownloadState.NOT_DOWNLOADED || state == ModelDownloadState.ERROR -> {
+                        Button(
+                            onClick = onDownload,
+                            enabled = supported,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = FlowInk,
+                                contentColor = Color.White,
+                                disabledContainerColor = Color(0xFFE0DDD7),
+                                disabledContentColor = Color(0xFF8A8D94)
+                            )
+                        ) {
+                            Text(if (supported) "Download" else "Unavailable on ${Build.SUPPORTED_ABIS.firstOrNull() ?: "device"}")
                         }
-                        curState == ModelDownloadState.DOWNLOADING -> {
-                            Text("Downloading ${model.downloadProgress}%...", style = MaterialTheme.typography.labelMedium)
+                    }
+                    state == ModelDownloadState.DOWNLOADING -> {
+                        Text("Downloading ${model.downloadProgress}%...", style = MaterialTheme.typography.labelMedium)
+                    }
+                    state == ModelDownloadState.DOWNLOADED -> {
+                        Button(
+                            onClick = onLoad,
+                            enabled = supported,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = FlowInk,
+                                contentColor = Color.White,
+                                disabledContainerColor = Color(0xFFE0DDD7),
+                                disabledContentColor = Color(0xFF8A8D94)
+                            )
+                        ) {
+                            Text(if (supported) "Load into RAM" else "Unavailable on ${Build.SUPPORTED_ABIS.firstOrNull() ?: "device"}")
                         }
-                        curState == ModelDownloadState.DOWNLOADED -> {
-                            Button(
-                                onClick = onLoad,
-                                enabled = isSupported,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = FlowInk,
-                                    contentColor = Color.White,
-                                    disabledContainerColor = Color(0xFFE0DDD7),
-                                    disabledContentColor = Color(0xFF8A8D94)
-                                )
-                            ) {
-                                Text(if (isSupported) "Load into RAM" else "Unavailable on x86_64")
-                            }
-                            OutlinedButton(onClick = onDelete, shape = RoundedCornerShape(12.dp)) {
-                                Text("Delete")
-                            }
+                        OutlinedButton(onClick = onDelete, shape = RoundedCornerShape(12.dp)) {
+                            Text("Delete")
                         }
-                        curState == ModelDownloadState.LOADED -> {
-                            Button(
-                                onClick = onUnload,
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = FlowEmerald, contentColor = Color.White)
-                            ) { Text("Loaded (Tap to Unload)") }
-                        }
+                    }
+                    state == ModelDownloadState.LOADED -> {
+                        Button(
+                            onClick = onUnload,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = FlowEmerald, contentColor = Color.White)
+                        ) { Text("Loaded (Tap to Unload)") }
                     }
                 }
             }

@@ -47,5 +47,12 @@ class FastPathEngineTest {
         assertTrue(out.contains("• Study\n"))
         assertTrue(out.contains("• Work\n"))
         assertTrue(out.contains("• Go to the gym"))
+
+        val restaurants = "We can go to these three restaurants: restaurant a, restaurant b, restaurant c."
+        val out2 = FastPathEngine.applyDeterministicCleanup(restaurants, emptyList(), formatLists = true)
+        assertTrue(out2.contains("We can go to these three restaurants:\n"))
+        assertTrue(out2.contains("• Restaurant a\n"))
+        assertTrue(out2.contains("• Restaurant b\n"))
+        assertTrue(out2.contains("• Restaurant c"))
     }
 }

@@ -103,8 +103,7 @@ fun HomeScreen(
     ) {
         item {
             HomeStatCard(
-                totalWords = totalWords,
-                ramTierLabel = app.ramTier.label
+                totalWords = totalWords
             )
         }
 

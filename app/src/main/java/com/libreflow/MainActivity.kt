@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -60,7 +61,16 @@ enum class FlowTab(val label: String, val icon: ImageVector) {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = SystemBarStyle.light(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            )
+        )
         setContent {
             LibreFlowTheme {
                 LibreFlowRoot()
@@ -132,19 +142,36 @@ private fun LibreFlowRoot() {
             )
         },
         bottomBar = {
-            NavigationBar(containerColor = FlowSurface) {
-                FlowTab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = currentTab == tab,
-                        onClick = { currentTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
-                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
-                            selectedIconColor = FlowInk,
-                            selectedTextColor = FlowInk,
-                            indicatorColor = com.libreflow.ui.theme.FlowSurfaceSubtle
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.HorizontalDivider(
+                    thickness = 1.dp,
+                    color = com.libreflow.ui.theme.FlowBorder
+                )
+                NavigationBar(
+                    containerColor = FlowSurface,
+                    tonalElevation = 0.dp
+                ) {
+                    FlowTab.entries.forEach { tab ->
+                        val isSelected = currentTab == tab
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { currentTab = tab },
+                            icon = { Icon(tab.icon, contentDescription = tab.label) },
+                            label = {
+                                Text(
+                                    text = tab.label,
+                                    fontWeight = if (isSelected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.SemiBold
+                                )
+                            },
+                            colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                                selectedIconColor = FlowInk,
+                                selectedTextColor = FlowInk,
+                                unselectedIconColor = androidx.compose.ui.graphics.Color(0xFF4B4E56),
+                                unselectedTextColor = androidx.compose.ui.graphics.Color(0xFF4B4E56),
+                                indicatorColor = com.libreflow.ui.theme.FlowBorder
+                            )
                         )
-                    )
+                    }
                 }
             }
         }

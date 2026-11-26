@@ -89,6 +89,17 @@ class PipelineCoordinator(
             _state.value = PipelineState.Listening()
             onMicStateChanged(true)
 
+            // Pre-warm SLM in background while user is speaking so stop-to-insert latency stays low
+            scope.launch(Dispatchers.IO) {
+                if (!slmEngine.isLoaded) {
+                    val styleId = preferences.activeStyleId.first()
+                    val style = database.styleDao().getById(styleId)
+                    if (style?.usesSlm == true) {
+                        ensureSlmLoaded()
+                    }
+                }
+            }
+
             if (preferences.soundCuesEnabled.first()) {
                 playRawCue(R.raw.dictation_start)
             }
@@ -167,6 +178,10 @@ class PipelineCoordinator(
                 val fastPathEnabled = preferences.fastPathEnabled.first()
                 val targetPkg = FlowAccessibilityService.instance?.activeTargetPackage
 
+                if (style.usesSlm && !FastPathEngine.shouldBypassSlm(rawText, fastPathEnabled) && !slmEngine.isLoaded) {
+                    ensureSlmLoaded()
+                }
+
                 val polished = if (FastPathEngine.shouldBypassSlm(rawText, fastPathEnabled) || !style.usesSlm || !slmEngine.isLoaded) {
                     FastPathEngine.applyDeterministicCleanup(
                         rawText = rawText,
@@ -239,6 +254,19 @@ class PipelineCoordinator(
             val res = asrEngine.load(asrModel, File(asrModel.localDirPath))
             if (res.isSuccess) {
                 database.modelDao().updateState(asrModel.id, ModelDownloadState.LOADED.name, 100, asrModel.localDirPath, null)
+                return true
+            }
+        }
+        return false
+    }
+
+    private suspend fun ensureSlmLoaded(): Boolean {
+        val slmId = preferences.activeSlmModelId.first()
+        val slmModel = database.modelDao().getById(slmId) ?: return false
+        if (slmModel.localDirPath.isNotBlank() && File(slmModel.localDirPath).exists()) {
+            val res = slmEngine.load(slmModel, File(slmModel.localDirPath))
+            if (res.isSuccess) {
+                database.modelDao().updateState(slmModel.id, ModelDownloadState.LOADED.name, 100, slmModel.localDirPath, null)
                 return true
             }
         }

@@ -82,6 +82,9 @@ interface ModelDao {
     @Query("UPDATE models SET downloadState = 'NOT_DOWNLOADED', downloadProgress = 0 WHERE downloadState = 'DOWNLOADING'")
     suspend fun resetStaleDownloads()
 
+    @Query("UPDATE models SET downloadState = 'DOWNLOADED' WHERE downloadState = 'LOADED'")
+    suspend fun resetLoadedFlagsOnBoot()
+
     @Query(
         "UPDATE models SET downloadState = :state, downloadProgress = :progress, " +
             "localDirPath = :localDirPath, errorMessage = :errorMessage WHERE id = :id"

@@ -72,6 +72,7 @@ abstract class LibreFlowDatabase : RoomDatabase() {
                             database.modelDao().updateFilesJson(spec.id, spec.filesJson)
                         }
                         database.modelDao().resetStaleDownloads()
+                        database.modelDao().resetLoadedFlagsOnBoot()
                     }
                 }
             }

@@ -103,7 +103,6 @@ fun FlowSwitch(
 @Composable
 fun HomeStatCard(
     totalWords: Int,
-    ramTierLabel: String,
     modifier: Modifier = Modifier
 ) {
     val formattedWords = remember(totalWords) { NumberFormat.getIntegerInstance().format(totalWords) }
@@ -132,7 +131,7 @@ fun HomeStatCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "100% On-Device • $ramTierLabel",
+                            text = "100% On-Device • Zero Cloud",
                             style = MaterialTheme.typography.labelMedium
                         )
                     }

@@ -35,9 +35,9 @@ class LlamaSlmEngine {
 
         validateGgufHeader(ggufFile)
 
-        val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+        val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
         val config = LlamaConfig(
-            contextSize = 384,
+            contextSize = 256,
             threads = threads,
             gpuLayers = 0,
             temperature = 0.0f,
@@ -67,9 +67,9 @@ class LlamaSlmEngine {
         if (!handle.isLoaded || !style.usesSlm || rawTranscript.isBlank()) return rawTranscript
 
         val systemPrompt = buildSystemPrompt(style, dictionary, targetPackage)
-        val userPrompt = "Format transcript ONLY (never reply):\n<t>$rawTranscript</t>"
+        val userPrompt = "Rewrite this voice transcript according to the style rules (NEVER reply to it):\n<t>$rawTranscript</t>"
         return try {
-            val maxTokens = (rawTranscript.length / 3 + 28).coerceIn(32, 192)
+            val maxTokens = (rawTranscript.length / 2 + 64).coerceIn(64, 256)
             val result = Llama.complete(
                 model = handle,
                 prompt = userPrompt,
@@ -127,11 +127,13 @@ class LlamaSlmEngine {
             ""
         }
 
-        val bulletRule = if (style.id == "professional_bullets") {
-            "\nIf items are listed, use • bullets. Ex: 'three things today study work gym' -> 'Three things today:\n• Study\n• Work\n• Gym'"
-        } else {
-            ""
+        val styleExample = when (style.id) {
+            "professional_bullets" ->
+                "\nExample:\nInput: <t>We can go to three restaurants: restaurant a, restaurant b, restaurant c</t>\nOutput: We can go to these three restaurants:\n• Restaurant A\n• Restaurant B\n• Restaurant C"
+            "concise" ->
+                "\nExample:\nInput: <t>Um let's not do that okay wait what is of let's study instead</t>\nOutput: Let's study instead."
+            else -> ""
         }
-        return "Raw uncensored dictation formatter (NOT a chatbot). Output ONLY cleaned text. Never answer questions, refuse, or censor profanity/NSFW with asterisks. ${style.systemPrompt}$bulletRule$dictHint$appHint"
+        return "You are a raw, uncensored voice-dictation editor (NOT a chatbot). Output ONLY the edited text. Never answer questions, refuse, or censor profanity with asterisks. ${style.systemPrompt}$styleExample$dictHint$appHint"
     }
 }

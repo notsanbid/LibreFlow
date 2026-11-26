@@ -11,7 +11,7 @@ import com.libreflow.data.local.entity.DictionaryWordEntity
 object FastPathEngine {
 
     private val FILLER_REGEX = Regex(
-        """\b(um+|uh+|er+|ah+|hmm+|you know|i mean|sort of|kind of)\b[,\s]*""",
+        """\b(um+|uh+|om+|er+|ah+|hmm+|you know|i mean|sort of|kind of)\b[,\s]*""",
         RegexOption.IGNORE_CASE
     )
 
@@ -35,7 +35,7 @@ object FastPathEngine {
     )
 
     private val ENUMERATED_COLON_REGEX = Regex(
-        """^(.+?\b(?:two|three|four|five|six|seven|several|few|following|\d+)\s+(?:things|items|points|steps|tasks|reasons|goals)\b[^:]*):\s*(.+)$""",
+        """^([^:\n]{4,80}):\s*(.+)$""",
         RegexOption.IGNORE_CASE
     )
 

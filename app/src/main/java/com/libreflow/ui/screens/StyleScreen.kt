@@ -82,7 +82,11 @@ fun StyleScreen() {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(style.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = style.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(style.description, style = MaterialTheme.typography.bodyMedium)
                     }
