@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -95,13 +97,13 @@ dependencies {
 }
 
 val sherpaAarFile = file("libs/sherpa-onnx-2.0.3.aar")
-val downloadSherpaOnnx by tasks.registering {
+val downloadSherpaOnnx = tasks.register("downloadSherpaOnnx") {
     onlyIf { !sherpaAarFile.exists() }
     doLast {
         sherpaAarFile.parentFile.mkdirs()
         val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.3/sherpa-onnx-2.0.3.aar"
         println("Downloading $url ...")
-        java.net.URI(url).toURL().openStream().use { input ->
+        URI(url).toURL().openStream().use { input ->
             sherpaAarFile.outputStream().use { output -> input.copyTo(output) }
         }
     }
