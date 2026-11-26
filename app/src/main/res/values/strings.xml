@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LibreFlow</string>
+    <string name="accessibility_service_label">LibreFlow Text Injector</string>
+    <string name="accessibility_service_description">Allows LibreFlow to detect active text fields and insert your locally dictated text into any app. Zero data leaves your device.</string>
+    <string name="ime_service_label">LibreFlow Voice Keyboard</string>
+</resources>

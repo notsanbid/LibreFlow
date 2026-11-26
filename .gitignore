@@ -1,0 +1,19 @@
+# Decompiled reference & local models
+decompiled/
+*.xapk
+*.apk
+*.gguf
+*.onnx
+*.bin
+
+# Gradle & Android Studio
+.gradle/
+build/
+*/build/
+local.properties
+.idea/
+*.iml
+.cxx/
+captures/
+*.jks
+*.keystore
