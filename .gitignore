@@ -9,6 +9,7 @@ decompiled/
 
 # Gradle & Android Studio
 .gradle/
+.kotlin/
 build/
 */build/
 local.properties

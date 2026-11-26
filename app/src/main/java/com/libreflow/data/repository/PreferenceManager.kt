@@ -31,8 +31,8 @@ class PreferenceManager(private val context: Context) {
     val bubbleOpacity: Flow<Float> = context.dataStore.data.map { it[Keys.BUBBLE_OPACITY] ?: 0.92f }
     val overlayEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.OVERLAY_ENABLED] ?: false }
     val activeStyleId: Flow<String> = context.dataStore.data.map { it[Keys.ACTIVE_STYLE_ID] ?: "professional_bullets" }
-    val activeAsrModelId: Flow<String> = context.dataStore.data.map { it[Keys.ACTIVE_ASR_MODEL_ID] ?: "whisper-base-en" }
-    val activeSlmModelId: Flow<String> = context.dataStore.data.map { it[Keys.ACTIVE_SLM_MODEL_ID] ?: "qwen-2.5-1.5b" }
+    val activeAsrModelId: Flow<String> = context.dataStore.data.map { it[Keys.ACTIVE_ASR_MODEL_ID] ?: "parakeet-tdt-0.6b-v2" }
+    val activeSlmModelId: Flow<String> = context.dataStore.data.map { it[Keys.ACTIVE_SLM_MODEL_ID] ?: "qwen3-0.6b" }
     val fastPathEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.FAST_PATH_ENABLED] ?: true }
     val soundCuesEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.SOUND_CUES_ENABLED] ?: true }
     val hapticsEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.HAPTICS_ENABLED] ?: true }

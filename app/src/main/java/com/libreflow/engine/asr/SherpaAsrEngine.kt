@@ -6,6 +6,7 @@ import com.k2fsa.sherpa.onnx.OfflineMoonshineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
 import com.libreflow.data.local.entity.ModelDescriptorEntity
 import java.io.File
@@ -55,6 +56,18 @@ class SherpaAsrEngine {
                 numThreads = threads,
                 debug = false,
                 modelType = "whisper"
+            )
+
+            "nemo_transducer" -> OfflineModelConfig(
+                transducer = OfflineTransducerModelConfig(
+                    encoder = File(modelDir, "encoder.int8.onnx").absolutePath,
+                    decoder = File(modelDir, "decoder.int8.onnx").absolutePath,
+                    joiner = File(modelDir, "joiner.int8.onnx").absolutePath
+                ),
+                tokens = File(modelDir, "tokens.txt").absolutePath,
+                numThreads = threads,
+                debug = false,
+                modelType = "nemo_transducer"
             )
 
             "sense_voice" -> OfflineModelConfig(

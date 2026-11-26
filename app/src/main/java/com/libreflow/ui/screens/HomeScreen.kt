@@ -9,6 +9,8 @@ import android.provider.Settings
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
@@ -64,6 +67,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     hasMicPermission: Boolean,
@@ -78,8 +82,12 @@ fun HomeScreen(
     val pipelineState by app.pipeline.state.collectAsState()
     val overlayEnabled by app.preferences.overlayEnabled.collectAsState(initial = false)
 
+    val pm = remember { context.getSystemService(android.os.PowerManager::class.java) }
     val canDrawOverlaysState = remember { androidx.compose.runtime.mutableStateOf(Settings.canDrawOverlays(context)) }
     val isA11yEnabledState = remember { androidx.compose.runtime.mutableStateOf(isAccessibilityEnabled(context)) }
+    val isBatteryUnrestrictedState = remember {
+        androidx.compose.runtime.mutableStateOf(pm?.isIgnoringBatteryOptimizations(context.packageName) ?: true)
+    }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
@@ -87,6 +95,7 @@ fun HomeScreen(
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 canDrawOverlaysState.value = Settings.canDrawOverlays(context)
                 isA11yEnabledState.value = isAccessibilityEnabled(context)
+                isBatteryUnrestrictedState.value = pm?.isIgnoringBatteryOptimizations(context.packageName) ?: true
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -95,6 +104,7 @@ fun HomeScreen(
 
     val canDrawOverlays = canDrawOverlaysState.value
     val isA11yEnabled = isA11yEnabledState.value
+    val isBatteryUnrestricted = isBatteryUnrestrictedState.value
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -149,9 +159,13 @@ fun HomeScreen(
                         )
                     }
 
-                    if (!hasMicPermission || !isA11yEnabled) {
+                    if (!hasMicPermission || !isA11yEnabled || !isBatteryUnrestricted) {
                         Spacer(modifier = Modifier.height(14.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             if (!hasMicPermission) {
                                 OutlinedButton(
                                     onClick = onRequestMicPermission,
@@ -165,9 +179,32 @@ fun HomeScreen(
                                     onClick = {
                                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                                     },
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.5.dp, FlowDanger),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = FlowDanger)
+                                ) {
+                                    Icon(
+                                        imageVector = androidx.compose.material.icons.Icons.Rounded.ErrorOutline,
+                                        contentDescription = null,
+                                        tint = FlowDanger,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Enable Injector", color = FlowDanger)
+                                }
+                            }
+                            if (!isBatteryUnrestricted) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val intent = Intent(
+                                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                            Uri.parse("package:${context.packageName}")
+                                        )
+                                        context.startActivity(intent)
+                                    },
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
-                                    Text("Enable Injector")
+                                    Text("Unrestricted CPU")
                                 }
                             }
                         }

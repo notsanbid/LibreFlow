@@ -22,8 +22,8 @@ class SileroVadEngine {
     fun load(modelDir: File): Result<Unit> = runCatching {
         unload()
         val modelFile = File(modelDir, "silero_vad.onnx")
-        require(modelFile.exists() && modelFile.length() > 1024L) {
-            "Missing or incomplete silero_vad.onnx in ${modelDir.absolutePath}"
+        require(modelFile.exists() && modelFile.canRead() && modelFile.length() > 1024L) {
+            "Missing or unreadable silero_vad.onnx in ${modelDir.absolutePath}"
         }
 
         Log.d("LibreFlow", "Loading Silero VAD from ${modelFile.absolutePath} (${modelFile.length()} bytes)")
@@ -31,8 +31,8 @@ class SileroVadEngine {
             sileroVadModelConfig = SileroVadModelConfig(
                 model = modelFile.absolutePath,
                 threshold = 0.5f,
-                minSilenceDuration = 0.45f,
-                minSpeechDuration = 0.20f,
+                minSilenceDuration = 0.35f,
+                minSpeechDuration = 0.16f,
                 windowSize = 512,
                 maxSpeechDuration = 25.0f
             ),

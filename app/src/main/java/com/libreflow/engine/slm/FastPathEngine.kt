@@ -44,12 +44,16 @@ object FastPathEngine {
         RegexOption.IGNORE_CASE
     )
 
-    fun shouldBypassSlm(rawText: String, fastPathEnabled: Boolean): Boolean {
+    private val THINK_BLOCK_REGEX = Regex("""<think>[\s\S]*?</think>""", RegexOption.IGNORE_CASE)
+
+    fun shouldBypassSlm(rawText: String, fastPathEnabled: Boolean, styleId: String = ""): Boolean {
         if (!fastPathEnabled) return false
+        if (styleId == "concise") return false
         val trimmed = rawText.trim()
         if (trimmed.isEmpty()) return true
         val words = trimmed.split(Regex("""\s+"""))
-        if (words.size > 3) return false
+        if (words.size > 8) return false
+        if (trimmed.contains(":") || LIST_MARKER_REGEX.containsMatchIn(trimmed)) return false
         return !FILLER_REGEX.containsMatchIn(trimmed)
     }
 
@@ -101,7 +105,7 @@ object FastPathEngine {
     )
 
     fun sanitizeSlmOutput(slmOutput: String, verbatimFallback: String): String {
-        val cleaned = slmOutput.trim()
+        val cleaned = THINK_BLOCK_REGEX.replace(slmOutput, "").trim()
         if (cleaned.isEmpty()) return verbatimFallback
         val lower = cleaned.lowercase()
         if (REFUSAL_PATTERNS.any { lower.contains(it) }) {

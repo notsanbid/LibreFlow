@@ -77,9 +77,14 @@ fun ModelsScreen() {
     val models by app.database.modelDao().observeAll().collectAsState(initial = emptyList())
     var loadingIds by remember { mutableStateOf(emptySet<String>()) }
 
+    val asrOrder = listOf("parakeet-tdt-0.6b-v2", "moonshine-base-en", "moonshine-tiny-en", "sensevoice-small")
+    val slmOrder = listOf("qwen3-0.6b", "qwen-2.5-0.5b", "qwen-2.5-1.5b")
+
     val vadModels = models.filter { it.stage == ModelStage.VAD.name }
     val asrModels = models.filter { it.stage == ModelStage.ASR.name }
+        .sortedBy { m -> asrOrder.indexOf(m.id).let { if (it == -1) Int.MAX_VALUE else it } }
     val slmModels = models.filter { it.stage == ModelStage.SLM.name }
+        .sortedBy { m -> slmOrder.indexOf(m.id).let { if (it == -1) Int.MAX_VALUE else it } }
 
     val vadReady = vadModels.any { it.downloadState == ModelDownloadState.LOADED.name }
     val asrReady = asrModels.any { it.downloadState == ModelDownloadState.LOADED.name }
@@ -109,6 +114,7 @@ fun ModelsScreen() {
                     else -> Result.failure(IllegalStateException("Unknown stage"))
                 }
                 if (result.isSuccess) {
+                    app.database.modelDao().markOtherModelsUnloaded(model.stage, model.id)
                     app.database.modelDao().updateState(
                         model.id,
                         ModelDownloadState.LOADED.name,
@@ -157,7 +163,7 @@ fun ModelsScreen() {
             Text("Local AI Models", style = MaterialTheme.typography.headlineMedium)
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Models are stored in Downloads/LibreFlowModels and memory-mapped on demand.",
+                text = "Models are stored privately in app storage and memory-mapped on demand.",
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -196,7 +202,12 @@ fun ModelsScreen() {
             ModelItemCard(
                 model = model,
                 isLoadingIntoRam = model.id in loadingIds,
-                requirementBadge = if (model.id == "moonshine-tiny-en") "Fastest" else "ASR",
+                isRecommended = model.id == "parakeet-tdt-0.6b-v2",
+                requirementBadge = when (model.id) {
+                    "parakeet-tdt-0.6b-v2" -> "Recommended"
+                    "moonshine-tiny-en", "moonshine-base-en" -> "No 30s Pad"
+                    else -> "ASR"
+                },
                 onDownload = { app.applicationScope.launch { app.downloader.downloadModel(model) } },
                 onLoad = { loadModel(model) },
                 onUnload = { unloadModel(model) },
@@ -207,15 +218,17 @@ fun ModelsScreen() {
         item {
             SectionHeader(
                 title = "Step 3 · Smart AI Polish",
-                badge = "Optional",
-                subtitle = "Fixes grammar, removes fillers, and structures bullet points."
+                badge = "OPTIONAL",
+                subtitle = "Not required — Parakeet already handles punctuation & accuracy. Load at most 1 LLM only if you want extra rewriting or bullet points.",
+                isOptionalHighlight = true
             )
         }
         items(slmModels, key = { it.id }, contentType = { "model_card" }) { model ->
             ModelItemCard(
                 model = model,
                 isLoadingIntoRam = model.id in loadingIds,
-                requirementBadge = "Optional LLM",
+                isRecommended = model.id == "qwen3-0.6b",
+                requirementBadge = if (model.id == "qwen3-0.6b") "Recommended" else "Optional LLM",
                 onDownload = { app.applicationScope.launch { app.downloader.downloadModel(model) } },
                 onLoad = { loadModel(model) },
                 onUnload = { unloadModel(model) },
@@ -286,9 +299,14 @@ private fun SetupChecklistCard(vadReady: Boolean, asrReady: Boolean, slmReady: B
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Setup Checklist", style = MaterialTheme.typography.labelLarge)
+            Text(
+                text = "Steps 1 & 2 are all you need to dictate. Step 3 is completely optional.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = FlowMuted
+            )
             ChecklistRow("1. Voice Detection (Silero VAD)", vadReady, required = true)
-            ChecklistRow("2. Speech-to-Text (Pick one ASR)", asrReady, required = true)
-            ChecklistRow("3. Smart AI Polish (Optional LLM)", slmReady, required = false)
+            ChecklistRow("2. Speech-to-Text (Pick 1 ASR)", asrReady, required = true)
+            ChecklistRow("3. Smart AI Polish (Skip for fastest speed)", slmReady, required = false)
         }
     }
 }
@@ -312,15 +330,29 @@ private fun ChecklistRow(label: String, done: Boolean, required: Boolean) {
 }
 
 @Composable
-private fun SectionHeader(title: String, badge: String, subtitle: String) {
-    Column(modifier = Modifier.padding(top = 6.dp)) {
+private fun SectionHeader(
+    title: String,
+    badge: String,
+    subtitle: String,
+    isOptionalHighlight: Boolean = false
+) {
+    Column(modifier = Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
-            Surface(shape = RoundedCornerShape(999.dp), color = FlowSurfaceSubtle) {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = if (isOptionalHighlight) FlowEmerald.copy(alpha = 0.14f) else FlowSurfaceSubtle,
+                modifier = if (isOptionalHighlight) {
+                    Modifier.border(1.dp, FlowEmerald.copy(alpha = 0.45f), RoundedCornerShape(999.dp))
+                } else {
+                    Modifier
+                }
+            ) {
                 Text(
                     text = badge,
                     style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    color = if (isOptionalHighlight) FlowEmerald else FlowInk,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                 )
             }
         }
@@ -332,6 +364,7 @@ private fun SectionHeader(title: String, badge: String, subtitle: String) {
 private fun ModelItemCard(
     model: ModelDescriptorEntity,
     isLoadingIntoRam: Boolean,
+    isRecommended: Boolean = false,
     requirementBadge: String,
     onDownload: () -> Unit,
     onLoad: () -> Unit,
@@ -346,7 +379,11 @@ private fun ModelItemCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, FlowBorder, RoundedCornerShape(18.dp)),
+            .border(
+                width = if (isRecommended) 1.5.dp else 1.dp,
+                color = if (isRecommended) FlowEmerald.copy(alpha = 0.55f) else FlowBorder,
+                shape = RoundedCornerShape(18.dp)
+            ),
         shape = RoundedCornerShape(18.dp),
         color = FlowSurface
     ) {
@@ -357,10 +394,14 @@ private fun ModelItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(model.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Surface(shape = RoundedCornerShape(999.dp), color = FlowSurfaceSubtle) {
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = if (isRecommended) com.libreflow.ui.theme.FlowEmeraldTint else FlowSurfaceSubtle
+                ) {
                     Text(
                         text = "$requirementBadge • ${model.sizeMb} MB",
                         style = MaterialTheme.typography.labelMedium,
+                        color = if (isRecommended) FlowEmerald else FlowInk,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }

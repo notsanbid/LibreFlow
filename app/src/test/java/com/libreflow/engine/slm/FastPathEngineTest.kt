@@ -10,9 +10,10 @@ class FastPathEngineTest {
 
     @Test
     fun `fast path bypasses short utterance without fillers`() {
-        assertTrue(FastPathEngine.shouldBypassSlm("Sounds good", fastPathEnabled = true))
+        assertTrue(FastPathEngine.shouldBypassSlm("Sounds good, let's do it today", fastPathEnabled = true))
         assertFalse(FastPathEngine.shouldBypassSlm("Um sounds good", fastPathEnabled = true))
-        assertFalse(FastPathEngine.shouldBypassSlm("One two three four", fastPathEnabled = true))
+        assertFalse(FastPathEngine.shouldBypassSlm("One two three four five six seven eight nine", fastPathEnabled = true))
+        assertFalse(FastPathEngine.shouldBypassSlm("Let's study instead", fastPathEnabled = true, styleId = "concise"))
     }
 
     @Test

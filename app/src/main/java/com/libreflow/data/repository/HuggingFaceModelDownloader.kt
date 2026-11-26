@@ -27,14 +27,11 @@ class HuggingFaceModelDownloader(
         .build()
 
     fun getModelsRootDir(): File {
-        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        val dir = File(downloads, "LibreFlowModels")
-        if (!dir.exists() && !dir.mkdirs()) {
-            val fallback = File(context.filesDir, "LibreFlowModels")
-            fallback.mkdirs()
-            return fallback
+        val extDir = context.getExternalFilesDir("LibreFlowModels")
+        if (extDir != null && (extDir.exists() || extDir.mkdirs())) {
+            return extDir
         }
-        return dir
+        return File(context.filesDir, "LibreFlowModels").apply { mkdirs() }
     }
 
     fun getModelDir(modelId: String): File = File(getModelsRootDir(), modelId).apply { mkdirs() }

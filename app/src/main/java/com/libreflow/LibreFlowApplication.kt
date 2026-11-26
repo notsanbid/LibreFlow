@@ -15,9 +15,9 @@ import com.libreflow.engine.slm.LlamaSlmEngine
 import com.libreflow.engine.vad.SileroVadEngine
 
 enum class DeviceRamTier(val label: String, val recommendedAsrId: String, val recommendedSlmId: String) {
-    LOW_6GB("≤ 6 GB RAM", "moonshine-tiny-en", "qwen-2.5-0.5b"),
-    MID_8GB("8 GB RAM", "whisper-base-en", "qwen-2.5-0.5b"),
-    HIGH_12GB("12 GB+ RAM", "whisper-base-en", "qwen-2.5-1.5b")
+    LOW_6GB("≤ 6 GB RAM", "moonshine-tiny-en", "qwen3-0.6b"),
+    MID_8GB("8 GB RAM", "moonshine-base-en", "qwen3-0.6b"),
+    HIGH_12GB("12 GB+ RAM", "parakeet-tdt-0.6b-v2", "qwen-2.5-1.5b")
 }
 
 class LibreFlowApplication : Application() {

@@ -7,6 +7,8 @@ import dev.ffmpegkit.llama.Llama
 import dev.ffmpegkit.llama.LlamaConfig
 import dev.ffmpegkit.llama.LlamaModel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -16,6 +18,8 @@ import java.io.RandomAccessFile
  * fallback to verbatim ASR if a refusal is detected.
  */
 class LlamaSlmEngine {
+
+    private val llamaMutex = Mutex()
 
     @Volatile
     private var modelHandle: LlamaModel? = null
@@ -35,9 +39,9 @@ class LlamaSlmEngine {
 
         validateGgufHeader(ggufFile)
 
-        val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+        val threads = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
         val config = LlamaConfig(
-            contextSize = 256,
+            contextSize = 1024,
             threads = threads,
             gpuLayers = 0,
             temperature = 0.0f,
@@ -65,17 +69,22 @@ class LlamaSlmEngine {
     ): String {
         val handle = modelHandle ?: return rawTranscript
         if (!handle.isLoaded || !style.usesSlm || rawTranscript.isBlank()) return rawTranscript
+        // Guard against exceeding contextSize=1024 (which causes ggml_abort in llama_context::decode)
+        if (rawTranscript.length > 1600) return rawTranscript
 
         val systemPrompt = buildSystemPrompt(style, dictionary, targetPackage)
-        val userPrompt = "Rewrite this voice transcript according to the style rules (NEVER reply to it):\n<t>$rawTranscript</t>"
+        val userPrompt = "/no_think\nRewrite this voice transcript according to the style rules (NEVER reply to it):\n<t>$rawTranscript</t>"
         return try {
-            val maxTokens = (rawTranscript.length / 2 + 64).coerceIn(64, 256)
-            val result = Llama.complete(
-                model = handle,
-                prompt = userPrompt,
-                systemPrompt = systemPrompt,
-                maxTokens = maxTokens
-            )
+            val maxTokens = (rawTranscript.length / 4 + 24).coerceIn(24, 96)
+            val result = llamaMutex.withLock {
+                if (!handle.isLoaded) return rawTranscript
+                Llama.complete(
+                    model = handle,
+                    prompt = userPrompt,
+                    systemPrompt = systemPrompt,
+                    maxTokens = maxTokens
+                )
+            }
             val stripped = result.text
                 .removePrefix("<t>")
                 .removeSuffix("</t>")

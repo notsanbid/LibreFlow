@@ -21,7 +21,7 @@ class BootCompletedReceiver : BroadcastReceiver() {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     if (app.preferences.overlayEnabled.first()) {
-                        FlowOverlayService.start(context)
+                        runCatching { FlowOverlayService.start(context) }
                     }
                 } finally {
                     pending.finish()

@@ -58,46 +58,50 @@ class PipelineCoordinator(
     private val accumulatedSegments = mutableListOf<String>()
     private val fullAudioBuffer = mutableListOf<FloatArray>()
     private var recordingStartMs = 0L
+    private val lastToggleMs = java.util.concurrent.atomic.AtomicLong(0L)
+    private val isTransitioning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val isFinalizing = java.util.concurrent.atomic.AtomicBoolean(false)
 
     fun toggleDictation(onMicStateChanged: (Boolean) -> Unit = {}) {
+        val now = System.currentTimeMillis()
+        val prev = lastToggleMs.get()
+        if (now - prev < 350L || !isTransitioning.compareAndSet(false, true)) return
+        lastToggleMs.set(now)
+
         when (_state.value) {
             is PipelineState.Listening -> stopAndFinalize(onMicStateChanged)
             is PipelineState.Idle, is PipelineState.Done, is PipelineState.Error -> startDictation(onMicStateChanged)
-            is PipelineState.Processing -> Unit
+            is PipelineState.Processing -> isTransitioning.set(false)
         }
     }
 
     fun startDictation(onMicStateChanged: (Boolean) -> Unit = {}) {
-        if (_state.value is PipelineState.Listening || _state.value is PipelineState.Processing) return
+        if (_state.value is PipelineState.Listening || _state.value is PipelineState.Processing) {
+            isTransitioning.set(false)
+            return
+        }
 
         scope.launch {
-            if (!asrEngine.isLoaded) {
-                val loaded = ensureModelsLoaded()
-                if (!loaded) {
-                    _state.value = PipelineState.Error("Download & load an ASR model in Models tab first")
-                    return@launch
-                }
-            }
-
-            // Capture target focus node BEFORE starting overlay/mic transitions
-            FlowAccessibilityService.instance?.captureFocusedNode()
-
-            accumulatedSegments.clear()
-            fullAudioBuffer.clear()
-            vadEngine.reset()
-            recordingStartMs = System.currentTimeMillis()
-            _state.value = PipelineState.Listening()
-            onMicStateChanged(true)
-
-            // Pre-warm SLM in background while user is speaking so stop-to-insert latency stays low
-            scope.launch(Dispatchers.IO) {
-                if (!slmEngine.isLoaded) {
-                    val styleId = preferences.activeStyleId.first()
-                    val style = database.styleDao().getById(styleId)
-                    if (style?.usesSlm == true) {
-                        ensureSlmLoaded()
+            try {
+                if (!asrEngine.isLoaded) {
+                    val loaded = ensureModelsLoaded()
+                    if (!loaded) {
+                        _state.value = PipelineState.Error("Download & load an ASR model in Models tab first")
+                        return@launch
                     }
                 }
+
+                // Capture target focus node BEFORE starting overlay/mic transitions
+                FlowAccessibilityService.instance?.captureFocusedNode()
+
+                accumulatedSegments.clear()
+                fullAudioBuffer.clear()
+                vadEngine.reset()
+                recordingStartMs = System.currentTimeMillis()
+                _state.value = PipelineState.Listening()
+                onMicStateChanged(true)
+            } finally {
+                isTransitioning.set(false)
             }
 
             if (preferences.soundCuesEnabled.first()) {
@@ -131,21 +135,25 @@ class PipelineCoordinator(
     }
 
     fun stopAndFinalize(onMicStateChanged: (Boolean) -> Unit = {}) {
-        if (_state.value !is PipelineState.Listening) return
+        if (_state.value !is PipelineState.Listening || !isFinalizing.compareAndSet(false, true)) {
+            isTransitioning.set(false)
+            return
+        }
+
+        // Transition synchronously so rapid double-taps cannot launch duplicate finalization jobs
+        val stopRequestedMs = System.currentTimeMillis()
+        _state.value = PipelineState.Processing
+        isTransitioning.set(false)
 
         scope.launch {
-            val stopRequestedMs = System.currentTimeMillis()
-            _state.value = PipelineState.Processing
-            audioCapture.stop()
-            captureJob?.join()
-            captureJob = null
-            onMicStateChanged(false)
-
-            if (preferences.soundCuesEnabled.first()) {
-                playRawCue(R.raw.dictation_stop)
-            }
-
             try {
+                audioCapture.stop()
+                captureJob?.join()
+                captureJob = null
+
+                if (preferences.soundCuesEnabled.first()) {
+                    playRawCue(R.raw.dictation_stop)
+                }
                 // Flush remaining VAD tail or transcribe full buffer if VAD wasn't loaded
                 if (vadEngine.isLoaded) {
                     val tailSegments = vadEngine.flushAndPopAll()
@@ -166,10 +174,15 @@ class PipelineCoordinator(
                 }
 
                 val rawText = accumulatedSegments.joinToString(" ").trim()
+                accumulatedSegments.clear()
+                fullAudioBuffer.clear()
                 if (rawText.isBlank()) {
                     _state.value = PipelineState.Idle
                     return@launch
                 }
+
+                val asrEndMs = System.currentTimeMillis()
+                val asrMs = (asrEndMs - stopRequestedMs).coerceAtLeast(1L)
 
                 val dictionary = database.dictionaryDao().getAllSnapshot()
                 val styleId = preferences.activeStyleId.first()
@@ -178,11 +191,9 @@ class PipelineCoordinator(
                 val fastPathEnabled = preferences.fastPathEnabled.first()
                 val targetPkg = FlowAccessibilityService.instance?.activeTargetPackage
 
-                if (style.usesSlm && !FastPathEngine.shouldBypassSlm(rawText, fastPathEnabled) && !slmEngine.isLoaded) {
-                    ensureSlmLoaded()
-                }
-
-                val polished = if (FastPathEngine.shouldBypassSlm(rawText, fastPathEnabled) || !style.usesSlm || !slmEngine.isLoaded) {
+                val slmStartMs = System.currentTimeMillis()
+                val bypass = FastPathEngine.shouldBypassSlm(rawText, fastPathEnabled, style.id)
+                val polished = if (bypass || !style.usesSlm || !slmEngine.isLoaded) {
                     FastPathEngine.applyDeterministicCleanup(
                         rawText = rawText,
                         dictionary = dictionary,
@@ -195,9 +206,15 @@ class PipelineCoordinator(
                 }
 
                 val now = System.currentTimeMillis()
+                val slmMs = (now - slmStartMs).coerceAtLeast(0L)
                 val latencyMs = (now - stopRequestedMs).coerceAtLeast(1L)
                 val durationMs = (stopRequestedMs - recordingStartMs).coerceAtLeast(1L)
                 val wordCount = polished.split(Regex("""\s+""")).count { it.isNotBlank() }
+
+                android.util.Log.i(
+                    "LibreFlowPerf",
+                    "asrMs=$asrMs slmMs=$slmMs totalMs=$latencyMs bypass=$bypass words=$wordCount"
+                )
 
                 // Inject into target app (IME first if active, else Accessibility Service)
                 val ime = LibreFlowImeService.instance
@@ -234,6 +251,9 @@ class PipelineCoordinator(
                         _state.value = PipelineState.Idle
                     }
                 }
+            } finally {
+                onMicStateChanged(false)
+                isFinalizing.set(false)
             }
         }
     }

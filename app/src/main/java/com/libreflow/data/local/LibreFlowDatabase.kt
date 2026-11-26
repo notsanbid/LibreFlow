@@ -68,11 +68,13 @@ abstract class LibreFlowDatabase : RoomDatabase() {
                     INSTANCE?.let { database ->
                         val catalog = defaultModelCatalog()
                         database.modelDao().insertMissing(catalog)
+                        database.modelDao().deleteRemovedModels(catalog.map { it.id })
                         catalog.forEach { spec ->
                             database.modelDao().updateFilesJson(spec.id, spec.filesJson)
                         }
                         database.modelDao().resetStaleDownloads()
                         database.modelDao().resetLoadedFlagsOnBoot()
+                        database.modelDao().resetLegacyPublicStoragePaths()
                     }
                 }
             }
@@ -121,6 +123,26 @@ abstract class LibreFlowDatabase : RoomDatabase() {
                 filesJson = """[{"name":"silero_vad.onnx","url":"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"}]"""
             ),
             ModelDescriptorEntity(
+                id = "parakeet-tdt-0.6b-v2",
+                name = "Parakeet TDT 0.6B v2 (English)",
+                stage = ModelStage.ASR.name,
+                engineType = "nemo_transducer",
+                description = "Top English accuracy (~6% WER) with fast non-autoregressive TDT decoding (~650 MB RAM).",
+                sizeMb = 620,
+                ramRequirementMb = 680,
+                filesJson = """[{"name":"encoder.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/encoder.int8.onnx"},{"name":"decoder.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/decoder.int8.onnx"},{"name":"joiner.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/joiner.int8.onnx"},{"name":"tokens.txt","url":"https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8/resolve/main/tokens.txt"}]"""
+            ),
+            ModelDescriptorEntity(
+                id = "moonshine-base-en",
+                name = "Moonshine Base (English)",
+                stage = ModelStage.ASR.name,
+                engineType = "moonshine",
+                description = "High-speed English ASR with zero 30s padding overhead (~290 MB RAM).",
+                sizeMb = 265,
+                ramRequirementMb = 310,
+                filesJson = """[{"name":"preprocess.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-base-en-int8/resolve/main/preprocess.onnx"},{"name":"encode.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-base-en-int8/resolve/main/encode.int8.onnx"},{"name":"uncached_decode.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-base-en-int8/resolve/main/uncached_decode.int8.onnx"},{"name":"cached_decode.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-base-en-int8/resolve/main/cached_decode.int8.onnx"},{"name":"tokens.txt","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-base-en-int8/resolve/main/tokens.txt"}]"""
+            ),
+            ModelDescriptorEntity(
                 id = "moonshine-tiny-en",
                 name = "Moonshine Tiny (English)",
                 stage = ModelStage.ASR.name,
@@ -131,16 +153,6 @@ abstract class LibreFlowDatabase : RoomDatabase() {
                 filesJson = """[{"name":"preprocess.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/main/preprocess.onnx"},{"name":"encode.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/main/encode.int8.onnx"},{"name":"uncached_decode.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/main/uncached_decode.int8.onnx"},{"name":"cached_decode.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/main/cached_decode.int8.onnx"},{"name":"tokens.txt","url":"https://huggingface.co/csukuangfj/sherpa-onnx-moonshine-tiny-en-int8/resolve/main/tokens.txt"}]"""
             ),
             ModelDescriptorEntity(
-                id = "whisper-base-en",
-                name = "Whisper Base (English)",
-                stage = ModelStage.ASR.name,
-                engineType = "whisper",
-                description = "Balanced accuracy & speed for everyday English dictation (~180 MB RAM).",
-                sizeMb = 145,
-                ramRequirementMb = 200,
-                filesJson = """[{"name":"base.en-encoder.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base.en/resolve/main/base.en-encoder.int8.onnx"},{"name":"base.en-decoder.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base.en/resolve/main/base.en-decoder.int8.onnx"},{"name":"base.en-tokens.txt","url":"https://huggingface.co/csukuangfj/sherpa-onnx-whisper-base.en/resolve/main/base.en-tokens.txt"}]"""
-            ),
-            ModelDescriptorEntity(
                 id = "sensevoice-small",
                 name = "SenseVoice Small (Multilingual)",
                 stage = ModelStage.ASR.name,
@@ -149,6 +161,16 @@ abstract class LibreFlowDatabase : RoomDatabase() {
                 sizeMb = 230,
                 ramRequirementMb = 280,
                 filesJson = """[{"name":"model.int8.onnx","url":"https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/model.int8.onnx"},{"name":"tokens.txt","url":"https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/main/tokens.txt"}]"""
+            ),
+            ModelDescriptorEntity(
+                id = "qwen3-0.6b",
+                name = "Qwen 3 0.6B (Q4_K_M, Non-Thinking)",
+                stage = ModelStage.SLM.name,
+                engineType = "llama_gguf",
+                description = "Fastest sub-1B polish model (/no_think): ~35-50 tok/s on mobile CPUs (~520 MB RAM).",
+                sizeMb = 400,
+                ramRequirementMb = 550,
+                filesJson = """[{"name":"Qwen3-0.6B-Q4_K_M.gguf","url":"https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf"}]"""
             ),
             ModelDescriptorEntity(
                 id = "qwen-2.5-0.5b",

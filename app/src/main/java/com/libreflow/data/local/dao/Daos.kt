@@ -76,6 +76,9 @@ interface ModelDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertMissing(models: List<ModelDescriptorEntity>)
 
+    @Query("DELETE FROM models WHERE id NOT IN (:activeIds)")
+    suspend fun deleteRemovedModels(activeIds: List<String>)
+
     @Query("UPDATE models SET filesJson = :filesJson WHERE id = :id")
     suspend fun updateFilesJson(id: String, filesJson: String)
 
@@ -84,6 +87,12 @@ interface ModelDao {
 
     @Query("UPDATE models SET downloadState = 'DOWNLOADED' WHERE downloadState = 'LOADED'")
     suspend fun resetLoadedFlagsOnBoot()
+
+    @Query("UPDATE models SET downloadState = 'NOT_DOWNLOADED', downloadProgress = 0, localDirPath = '', errorMessage = NULL WHERE localDirPath LIKE '%/Download/LibreFlowModels/%'")
+    suspend fun resetLegacyPublicStoragePaths()
+
+    @Query("UPDATE models SET downloadState = 'DOWNLOADED' WHERE stage = :stage AND downloadState = 'LOADED' AND id != :exceptId")
+    suspend fun markOtherModelsUnloaded(stage: String, exceptId: String)
 
     @Query(
         "UPDATE models SET downloadState = :state, downloadProgress = :progress, " +
